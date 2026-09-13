@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shopfront
+  namespace: shopfront
+  annotations:
+    # Tell the AWS Load Balancer Controller to create an internet-facing ALB.
+    # Use "internal" for private/internal-only access.
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+
+    # IP target mode sends traffic directly to pod IPs, bypassing kube-proxy.
+    # This is more efficient and required for proper health check behavior.
+    alb.ingress.kubernetes.io/target-type: ip
+
+    # ALB health check — must match the app's readiness probe path.
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+
+    # Deregistration delay — give pods time to finish in-flight requests
+    # before the ALB stops sending traffic. Must be <= terminationGracePeriodSeconds.
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=25
+
+    # Tags for cost allocation
+    alb.ingress.kubernetes.io/tags: Environment=lab,App=shopfront
+
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

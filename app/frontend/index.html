@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShopFront — Karpenter Lab</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+    h1 { color: #232f3e; }
+    .card { background: white; border-radius: 8px; padding: 20px; margin: 16px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+    .on-demand { background: #d4edda; color: #155724; }
+    .spot { background: #fff3cd; color: #856404; }
+    pre { background: #232f3e; color: #fff; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+    button { background: #ff9900; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 4px; }
+    button:hover { background: #e88a00; }
+    #status { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>🛒 ShopFront — Karpenter Hands-On Lab</h1>
+
+  <div class="card">
+    <h3>Frontend Node Info</h3>
+    <p>Pod: <strong id="pod-name">loading...</strong></p>
+    <p>Node: <strong id="node-name">loading...</strong></p>
+    <p>Capacity Type: <span id="capacity-badge" class="badge">loading...</span></p>
+  </div>
+
+  <div class="card">
+    <h3>Backend API</h3>
+    <p id="status">Click a button to call the backend</p>
+    <button onclick="callApi('/health')">Health Check</button>
+    <button onclick="callApi('/products')">List Products</button>
+    <button onclick="callApi('/load?duration=10')">Simulate Load (10s)</button>
+    <pre id="api-response">—</pre>
+  </div>
+
+  <div class="card">
+    <h3>Lab Quick Reference</h3>
+    <p>Use these endpoints to drive Karpenter behavior:</p>
+    <ul>
+      <li><code>/load?duration=N</code> — spike CPU for N seconds (triggers scale-out)</li>
+      <li><code>/products</code> — normal read traffic</li>
+      <li><code>/health</code> — liveness probe endpoint</li>
+    </ul>
+  </div>
+
+  <script>
+    // Fetch pod/node metadata from the backend
+    async function loadNodeInfo() {
+      try {
+        const res = await fetch('/api/nodeinfo');
+        const data = await res.json();
+        document.getElementById('pod-name').textContent = data.podName || 'N/A';
+        document.getElementById('node-name').textContent = data.nodeName || 'N/A';
+        const badge = document.getElementById('capacity-badge');
+        const ct = data.capacityType || 'unknown';
+        badge.textContent = ct;
+        badge.className = 'badge ' + (ct === 'spot' ? 'spot' : 'on-demand');
+      } catch (e) {
+        document.getElementById('pod-name').textContent = 'error';
+      }
+    }
+
+    async function callApi(path) {
+      document.getElementById('status').textContent = 'Calling ' + path + '...';
+      try {
+        const res = await fetch('/api' + path);
+        const data = await res.json();
+        document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('status').textContent = 'Response received ✓';
+      } catch (e) {
+        document.getElementById('api-response').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    loadNodeInfo();
+  </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-api-hpa
+  namespace: shopfront
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-api
+
+  minReplicas: 2
+  maxReplicas: 20
+
+  metrics:
+    # Scale on CPU utilization.
+    # When average CPU across all backend pods exceeds 60%,
+    # HPA adds replicas. When pods exceed node capacity,
+    # Karpenter provisions new nodes to fit them.
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+
+  behavior:
+    scaleUp:
+      # Scale up fast — don't wait when there's real load
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleDown:
+      # Scale down slowly — avoid thrashing during brief traffic dips.
+      # This also gives Karpenter time to consolidate nodes gracefully.
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60

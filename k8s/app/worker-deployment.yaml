@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: shopfront
+  labels:
+    app: worker
+spec:
+  # Start with 1 worker. Scale up in Lab 04 to trigger Karpenter spot provisioning.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      # Tolerate the taint on the spot-batch NodePool.
+      # Without this toleration, the worker pod would land on the
+      # general-purpose pool instead of the dedicated spot pool.
+      tolerations:
+        - key: workload-type
+          value: batch
+          effect: NoSchedule
+
+      # Prefer the spot-batch NodePool via nodeSelector.
+      # Combined with the toleration above, this ensures workers
+      # land on Spot nodes from the spot-batch pool.
+      nodeSelector:
+        nodepool: spot-batch
+
+      containers:
+        - name: worker
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/shopfront-worker:latest
+
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CAPACITY_TYPE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['karpenter.sh/capacity-type']
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+
+          # Workers must handle SIGTERM gracefully for Spot interruption.
+          # The worker.py code catches SIGTERM and finishes the current job.
+          # terminationGracePeriodSeconds must be >= your longest job duration.
+          lifecycle:
+            preStop:
+              exec:
+                # Give the worker a moment to notice the SIGTERM
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+      terminationGracePeriodSeconds: 60

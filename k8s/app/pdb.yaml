@@ -1,0 +1,26 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-api-pdb
+  namespace: shopfront
+spec:
+  # At least 1 backend pod must be available at all times.
+  # This prevents Karpenter from evicting all backend pods simultaneously
+  # during consolidation, which would cause downtime.
+  # In production, set this to at least 50% of your replica count.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+  namespace: shopfront
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: frontend

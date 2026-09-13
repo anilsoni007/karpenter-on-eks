@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shopfront
+  labels:
+    # This label is used by network policies and monitoring selectors
+    app.kubernetes.io/part-of: shopfront

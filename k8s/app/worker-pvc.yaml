@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: worker-data
+  namespace: shopfront
+spec:
+  # References the ebs-sc StorageClass from your cluster.
+  # WaitForFirstConsumer binding mode means the EBS volume is created
+  # in the same AZ as the pod — critical for Karpenter compatibility.
+  storageClassName: ebs-sc
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

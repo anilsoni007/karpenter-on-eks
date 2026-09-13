@@ -1,0 +1,62 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: spot-batch
+spec:
+  # Lower weight than general-purpose. Pods must explicitly target this
+  # pool via nodeSelector or toleration — it won't catch general workloads.
+  weight: 5
+
+  template:
+    metadata:
+      labels:
+        nodepool: spot-batch
+
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      # Taint this pool so only pods that tolerate it land here.
+      # This prevents critical workloads from accidentally running on Spot.
+      taints:
+        - key: workload-type
+          value: batch
+          effect: NoSchedule
+
+      requirements:
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+
+        # Spot ONLY for this pool — batch workloads are interruption-tolerant.
+        # Using multiple instance families (c, m, r) increases Spot availability
+        # because Karpenter can switch pools when one family is reclaimed.
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        - key: karpenter.k8s.aws/instance-size
+          operator: NotIn
+          values: ["nano", "micro", "small", "metal"]
+
+      expireAfter: 720h
+
+  limits:
+    cpu: "50"
+    memory: 200Gi
+
+  disruption:
+    # Batch nodes should consolidate aggressively — they're cheap and
+    # workloads are designed to be interrupted anyway.
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s

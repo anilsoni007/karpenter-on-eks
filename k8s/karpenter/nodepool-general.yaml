@@ -1,0 +1,80 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: general-purpose
+spec:
+  # weight determines preference when multiple NodePools match a pod.
+  # Higher = more preferred. This pool is the default catch-all.
+  weight: 10
+
+  template:
+    metadata:
+      labels:
+        # Custom label applied to every node in this pool.
+        # Useful for node selectors and monitoring dashboards.
+        nodepool: general-purpose
+
+    spec:
+      # Every node in this pool references the same EC2NodeClass,
+      # which defines the AMI, subnets, security groups, and instance profile.
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      # requirements are AND-ed together — all must be satisfied.
+      # Karpenter evaluates these against the EC2 instance type catalog.
+      requirements:
+        # Allow compute-optimized (c), general-purpose (m), and memory-optimized (r).
+        # Excludes GPU (p, g), bare metal, specialty instances, and t-family
+        # (t-family has its own dedicated nodepool-t-family.yaml).
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+
+        # Only 5th generation and newer. Older generations are slower
+        # and often more expensive per vCPU/GiB than newer ones.
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+
+        # x86_64 only. Create a separate NodePool for Graviton/ARM workloads.
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # Allow both On-Demand and Spot. Karpenter will prefer Spot
+        # when it's cheaper and available. Spot can be 70-90% cheaper.
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand", "spot"]
+
+        # Exclude very small instances that can't run typical workloads
+        # and very large instances that are hard to bin-pack.
+        - key: karpenter.k8s.aws/instance-size
+          operator: NotIn
+          values: ["nano", "micro", "small", "metal"]
+
+      # expireAfter forces node replacement on a schedule.
+      # This is your AMI rotation mechanism — nodes are replaced with
+      # fresh instances running the latest patched AMI.
+      # 720h = 30 days. Adjust based on your security policy.
+      expireAfter: 720h
+
+  # limits act as a hard budget cap for this NodePool.
+  # Karpenter will not provision nodes that would exceed these totals.
+  # This is your safety net against runaway scaling.
+  limits:
+    cpu: "100"
+    memory: 400Gi
+
+  disruption:
+    # WhenEmptyOrUnderutilized means Karpenter will:
+    # 1. Remove nodes with zero pods immediately
+    # 2. Consolidate underutilized nodes by bin-packing pods onto fewer nodes
+    consolidationPolicy: WhenEmptyOrUnderutilized
+
+    # How long a node must be underutilized before Karpenter consolidates it.
+    # 30s is aggressive — good for labs. Use 5m-10m in production to avoid
+    # unnecessary pod disruptions during normal traffic fluctuations.
+    consolidateAfter: 30s

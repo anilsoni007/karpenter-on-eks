@@ -1,0 +1,71 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: t-family
+spec:
+  # Higher weight than general-purpose (10) so Karpenter prefers this pool
+  # when your org restricts c/m/r families. Pods without an explicit nodeSelector
+  # will land here first since it has the highest weight.
+  weight: 20
+
+  template:
+    metadata:
+      labels:
+        nodepool: t-family
+
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      requirements:
+        # t-family = burstable instances (t3, t3a, t4g excluded via arch below).
+        # These are the cheapest general-purpose instances AWS offers.
+        # t3  — Intel, most widely available
+        # t3a — AMD, ~10% cheaper than t3 for same size
+        # Karpenter will pick whichever is cheapest/available at launch time.
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t"]
+
+        # t3/t3a are 3rd generation. Use Gt "2" to allow gen 3 and above.
+        # This excludes t1/t2 which are older and more expensive per vCPU.
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["2"]
+
+        # amd64 only — excludes t4g (Graviton/ARM).
+        # If you want t4g too, change this to ["amd64", "arm64"] and ensure
+        # your container images are built as multi-arch (linux/amd64 + linux/arm64).
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # Spot only — t-family Spot is extremely cheap (up to 70% off On-Demand).
+        # t3.medium Spot is typically ~$0.004/hr vs ~$0.0416/hr On-Demand.
+        # If you need On-Demand reliability, add "on-demand" to this list.
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+
+        # nano/micro are too small for most Kubernetes workloads — the kubelet
+        # and DaemonSets alone consume most of their memory.
+        # xlarge+ are excluded to keep costs low; t-family shines at small/medium sizes.
+        - key: karpenter.k8s.aws/instance-size
+          operator: NotIn
+          values: ["nano", "micro", "metal", "2xlarge", "4xlarge", "8xlarge", "16xlarge"]
+
+      expireAfter: 720h
+
+  # Conservative limits — t-family is for low-cost workloads, not heavy compute.
+  # t3.medium = 2 vCPU / 4Gi, so 20 CPU ~ 10 nodes worth of capacity.
+  limits:
+    cpu: "20"
+    memory: 80Gi
+
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    # t-family Spot can be reclaimed quickly — consolidate aggressively
+    # to keep the node count (and bill) as low as possible.
+    consolidateAfter: 30s

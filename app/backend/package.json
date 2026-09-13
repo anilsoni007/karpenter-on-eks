@@ -1,0 +1,12 @@
+{
+  "name": "shopfront-backend",
+  "version": "1.0.0",
+  "description": "ShopFront backend API for Karpenter hands-on lab",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,49 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  # AL2023 is the recommended AMI family for new EKS clusters.
+  # Karpenter resolves the actual AMI ID from SSM at launch time,
+  # so nodes always get the latest patched image for your cluster version.
+  amiSelectorTerms:
+    - alias: al2023@latest
+
+  # Karpenter discovers subnets by tag — not by hardcoded IDs.
+  # Any subnet tagged karpenter.sh/discovery=<cluster-name> is eligible.
+  # Karpenter will spread nodes across all matching subnets (multi-AZ).
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "soni-cluster"
+
+  # Same tag-based discovery for security groups.
+  # The cluster security group (tagged in Lab 01) allows node-to-control-plane
+  # communication on port 443 and the kubelet port range.
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "soni-cluster"
+
+  # The instance profile created in Lab 01.
+  # This gives the EC2 instance its IAM identity so it can:
+  # - Call the EKS cluster endpoint to join
+  # - Pull images from ECR
+  # - Use SSM Session Manager
+  instanceProfile: "KarpenterNodeInstanceProfile-soni-cluster"
+
+  # Block device configuration for the root volume.
+  # 15Gi is sufficient for most workloads. Increase if you run
+  # image-heavy workloads or need more ephemeral storage.
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 21Gi
+        volumeType: gp3
+        # Encrypt all node root volumes — non-negotiable in production.
+        encrypted: true
+        deleteOnTermination: true
+
+  # Tags applied to every EC2 instance Karpenter launches.
+  # These are critical for cost allocation and compliance.
+  tags:
+    ManagedBy: karpenter
+    Cluster: "soni-cluster"
