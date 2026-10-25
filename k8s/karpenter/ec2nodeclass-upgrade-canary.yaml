@@ -1,0 +1,32 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: upgrade-canary
+spec:
+  # Change this alias to a supported, pinned AL2023 AMI release for your
+  # cluster's Kubernetes version when running the canary upgrade exercise.
+  amiSelectorTerms:
+    - alias: al2023@latest
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "soni-cluster"
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "soni-cluster"
+
+  instanceProfile: "KarpenterNodeInstanceProfile-soni-cluster"
+
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 21Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+
+  tags:
+    ManagedBy: karpenter
+    Cluster: "soni-cluster"
+    Purpose: upgrade-canary

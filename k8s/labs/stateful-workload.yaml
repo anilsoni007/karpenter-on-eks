@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: karpenter-stateful-lab
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stateful-demo
+  namespace: karpenter-stateful-lab
+spec:
+  clusterIP: None
+  selector:
+    app: stateful-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: stateful-demo
+  namespace: karpenter-stateful-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: stateful-demo
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stateful-demo
+  namespace: karpenter-stateful-lab
+spec:
+  serviceName: stateful-demo
+  replicas: 2
+  selector:
+    matchLabels:
+      app: stateful-demo
+  template:
+    metadata:
+      labels:
+        app: stateful-demo
+    spec:
+      nodeSelector:
+        nodepool: stateful-lab
+        karpenter.sh/capacity-type: on-demand
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: stateful-demo
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: writer
+          image: public.ecr.aws/docker/library/busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              while true; do
+                printf '%s %s\n' "$(date -u +%FT%TZ)" "$POD_NAME" >> /data/writes.log
+                sleep 10
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ebs-sc
+        resources:
+          requests:
+            storage: 1Gi

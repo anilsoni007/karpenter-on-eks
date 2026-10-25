@@ -254,7 +254,11 @@ aws ec2 get-console-output --instance-id <instance-id> --output text | tail -50
 - [ ] Karpenter runs on On-Demand managed node group
 - [ ] Karpenter has 2+ replicas with PDB
 - [ ] All NodePools have appropriate `limits`
+- [ ] NodePool disruption budgets match workload and maintenance-window requirements
 - [ ] All NodePools have `expireAfter` set (AMI rotation)
+- [ ] Stateful workloads have tested AZ-aware volume recovery and backups
+- [ ] Node AMI and EKS upgrades use a canary and documented rollback path
+- [ ] Node Auto Repair prerequisites, feature gates, IAM, and budgets are validated
 - [ ] SQS interruption queue configured and EventBridge rules active
 - [ ] All application pods have resource `requests` set
 - [ ] PDBs configured for all critical services
@@ -267,9 +271,9 @@ aws ec2 get-console-output --instance-id <instance-id> --output text | tail -50
 
 ---
 
-## Congratulations
+## Wrap-Up
 
-You've completed the full Karpenter hands-on lab. You now understand:
+After completing Labs 00–08, continue with [Lab 09 — NodePool Disruption Budgets](./09-nodepool-disruption-budgets.md), then explore [Lab 10 — Stateful Workloads](./10-stateful-workloads.md), [Lab 11 — Safe Node and Cluster Upgrades](./11-safe-node-and-cluster-upgrades.md), [Lab 12 — Troubleshooting Provisioning](./12-troubleshooting-provisioning.md), and [Lab 13 — Node Health and Auto Repair](./13-node-health-and-repair.md). Across these labs, you have explored:
 
 - How Karpenter provisions nodes in response to pending pods
 - How to design NodePools for different workload classes
@@ -277,3 +281,4 @@ You've completed the full Karpenter hands-on lab. You now understand:
 - How consolidation reduces costs automatically
 - Advanced scheduling patterns for production workloads
 - Operational practices for running Karpenter at scale
+- Stateful volume topology, canary upgrades, provisioning diagnosis, and node health operations

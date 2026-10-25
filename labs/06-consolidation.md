@@ -79,6 +79,8 @@ kubectl get pdb -n shopfront
 
 Karpenter respects PDBs. If evicting a pod would violate a PDB, Karpenter skips that node and tries again later.
 
+PodDisruptionBudgets constrain pod eviction; NodePool disruption budgets separately limit how many voluntary node disruptions Karpenter can start. Both can affect consolidation. See [Lab 09 — NodePool Disruption Budgets](./09-nodepool-disruption-budgets.md) for a hands-on exercise.
+
 ### Pods with `do-not-disrupt` annotation
 ```bash
 # Annotate a pod to prevent it from being evicted during consolidation
